@@ -17,16 +17,15 @@ void LoadTex(Texture& tex, string filename) {
     }
 }
 
-void CreateBalloon(PhysicsShapeList<PhysicsSprite>& balloons) {
-    Texture redTex;
-    LoadTex(redTex, "duck.png");
+PhysicsSprite& CreateBalloon(PhysicsShapeList<PhysicsSprite>& balloons,Texture& redTex, World& world) {
     PhysicsSprite& balloon = balloons.Create();
     balloon.setTexture(redTex);
+    int x = 50;
     Vector2f sz = balloon.getSize();
-    int x = -static_cast<int>(sz.x);
-    int y = rand() % 300 + 50; // Random y position within the top half of the screen
-    balloon.setCenter(Vector2f(x, y));
-    balloon.setVelocity(Vector2f(0.25, 0)); // Adjust velocity as needed
+    balloon.setCenter(Vector2f(x, 20 + (sz.y / 2)));
+    balloon.setVelocity(Vector2f(0.25, 0));
+    world.AddPhysicsBody(balloon);
+    return balloon;
 }
 
 
@@ -56,42 +55,10 @@ int main()
     top.setCenter(Vector2f(400, 5));
     top.setStatic(true);
     world.AddPhysicsBody(top);
-
-    PhysicsRectangle left;
-    left.setSize(Vector2f(10, 600));
-    left.setCenter(Vector2f(5, 300));
-    left.setStatic(true);
-    world.AddPhysicsBody(left);
-
-    PhysicsRectangle right;
-    right.setSize(Vector2f(10, 600));
-    right.setCenter(Vector2f(795, 300));
-    right.setStatic(true);
-    world.AddPhysicsBody(right);
-
     Texture redTex;
     LoadTex(redTex, "duck.png");
     PhysicsShapeList<PhysicsSprite> balloons;
-    for (int i(0); i < 6; i++) {
-        PhysicsSprite& balloon = balloons.Create();
-        balloon.setTexture(redTex);
-        int x = 50 + ((700 / 5) * i);
-        Vector2f sz = balloon.getSize();
-        balloon.setCenter(Vector2f(x, 20 + (sz.y / 2)));
-        balloon.setVelocity(Vector2f(0.25, 0));
-        world.AddPhysicsBody(balloon);
-        balloon.onCollision =
-            [&drawingArrow, &world, &arrow, &balloon, &balloons, &score]
-            (PhysicsBodyCollisionResult result) {
-            if (result.object2 == arrow) {
-                drawingArrow = false;
-                world.RemovePhysicsBody(arrow);
-                world.RemovePhysicsBody(balloon);
-                balloons.QueueRemove(balloon);
-                score += 10;
-            }
-            };
-    }
+    
 
     top.onCollision = [&drawingArrow, &world, &arrow]
     (PhysicsBodyCollisionResult result) {
@@ -112,29 +79,39 @@ int main()
     Clock clock;
     Time lastTime(clock.getElapsedTime());
     Time currentTime(lastTime);
-    Time balloonCreationTime = seconds(2); // Time interval between balloon creation
+    //Time balloonCreationTime = seconds(2); // Time interval between balloon creation
 
     // Inside the main loop
     long balloonSpawnTime(0);
+
 
     while ((arrows > 0) || drawingArrow) {
         currentTime = clock.getElapsedTime();
         Time deltaTime = currentTime - lastTime;
         long deltaMS = deltaTime.asMilliseconds();
+     
         balloonSpawnTime += deltaMS; // Increment our balloon counter
 
         if (deltaMS > 9) {
+            cout << deltaMS << endl;
+            if (balloonSpawnTime >= 20000000) {
+                //cout << balloonSpawnTime << endl;
+                balloonSpawnTime = 0;
+                PhysicsSprite& balloon = CreateBalloon(balloons, redTex, world);
+                balloon.onCollision =
+                    [&drawingArrow, &world, &arrow, &balloon, &balloons, &score]
+                    (PhysicsBodyCollisionResult result) {
+                        if (result.object2 == arrow) {
+                            drawingArrow = false;
+                            world.RemovePhysicsBody(arrow);
+                        }
+                    };
+
+            }
             lastTime = currentTime;
             world.UpdatePhysics(deltaMS);
 
-            // Check if enough time has passed to spawn a new balloon
-            if (balloonSpawnTime > 2000) { // 2000 MS is 2 seconds
-                CreateBalloon(balloons);
-                balloonSpawnTime = 0; // Reset the balloon spawn time counter
-            }
-            else {
-                balloonSpawnTime += deltaMS; // Increment the balloon spawn time counter
-            }
+            
 
             if (Keyboard::isKeyPressed(Keyboard::Space) && arrows > 0 && !drawingArrow) {
                 drawingArrow = true;
